@@ -1,0 +1,5 @@
+#!/bin/bash
+
+./clang-format -i -style='{ "BasedOnStyle": "google", "IndentWidth": 4, "DerivePointerAlignment": false, "PointerAlignment": "Right" }' $@
+
+

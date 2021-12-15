@@ -1,0 +1,11 @@
+#!/bin/bash
+
+DIR="$(dirname "$(readlink -f "$0")")"
+
+if [ $# -ne 2 ]
+then
+	echo "Usage: $0 txtfile pngfile" 1>&2
+	exit 64
+fi
+
+$DIR/support/txt2dot < "$1" | dot -Tpng -o "$2"

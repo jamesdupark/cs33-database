@@ -1,0 +1,11 @@
+#!/bin/bash
+
+DIR="$(dirname "$(readlink -f "$0")")"
+
+if [ $# -ne 1 ]
+then
+	echo "Usage: $0 txtfile" 1>&2
+	exit 64
+fi
+
+$DIR/support/tree_checker < "$1"

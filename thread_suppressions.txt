@@ -1,0 +1,7 @@
+#file to ignore false positives in server.c
+#TSAN does not like the main thread freeing the resources of detached threads 
+
+race:client_destructor
+race:client_constructor 
+
+

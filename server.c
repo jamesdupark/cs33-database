@@ -284,18 +284,51 @@ void thread_cleanup(void *arg) {
 void *monitor_signal(void *arg) {
     // TODO: Wait for a SIGINT to be sent to the server process and cancel
     // all client threads when one arrives.
+
+    sig_handler_t *handler = (sig_handler_t *) arg;
+
+    int sig, err;
+    if ((err = sigwait(handler->set, &sig))) {
+        handle_error_en(err, "sigwait:");
+    }
+
+    printf("^C recieved by handler thread!");
+
+    pthread_mutex_lock(&thread_list_mutex);
+    delete_all();
+    pthread_mutex_unlock(&thread_list_mutex);
     return NULL;
 }
 
 sig_handler_t *sig_handler_constructor() {
     // TODO: Create a thread to handle SIGINT. The thread that this function
     // creates should be the ONLY thread that ever responds to SIGINT.
-    return NULL;
+    
+    // initialize handler
+    sig_handler_t *handler = checked_malloc(sizeof(sig_handler_t));
+    
+    // add SIGINT to handler set
+    if (sigemptyset(&handler->set) < 0) {
+        perror("sigemptyset:");
+        exit(1);
+    }
+    if (sigaddset(&handler->set, SIGINT) < 0) {
+        perror("sigaddset:");
+        exit(1);
+    }
+
+    checked_pthr_create(handler->thread, 0, monitor_signal, handler);    
+
+    return handler;
 }
 
 void sig_handler_destructor(sig_handler_t *sighandler) {
     // TODO: Free any resources allocated in sig_handler_constructor.
     // Cancel and join with the signal handler's thread.
+
+    pthread_cancel(sighandler->thread);
+    pthread_join(sighandler->thread);
+
 }
 
 // The arguments to the server should be the port number.
@@ -321,6 +354,7 @@ int main(int argc, char *argv[]) {
     signal(SIGPIPE, SIG_IGN);
 
     // set up sigint handler thread
+    sig_handler_t handler = sig_handler_constructor();
 
     thread_list_head = NULL;
 
@@ -328,7 +362,7 @@ int main(int argc, char *argv[]) {
     start_listener(8888, client_constructor);
 
     // start REPL
-    char *buf = checked_malloc(0x1000000000000000000000000000000000000000000000000000000000000000000);
+    char *buf = checked_malloc(1024);
     int len = 1;
     while (len) { // exits if len = 0 (EOF read)
         memset(buf, 0, 1024);
@@ -340,6 +374,6 @@ int main(int argc, char *argv[]) {
     }
 
     free(buf);
-
+    sig_handler_destructor(sig_handler);
     return 0;
 }

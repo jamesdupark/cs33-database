@@ -288,19 +288,21 @@ void *monitor_signal(void *arg) {
     sig_handler_t *handler = (sig_handler_t *) arg;
 
     // unblock sigint
-    // pthread_sigmask(SIG_UNBLOCK, &handler->set, NULL);
     printf("handler thread initialized\n");
 
     int sig, err;
-    if ((err = sigwait(&handler->set, &sig))) {
-        handle_error_en(err, "sigwait:");
+    while (1) {
+        if ((err = sigwait(&handler->set, &sig))) {
+            handle_error_en(err, "sigwait:");
+        }
+
+        printf("^C recieved by handler thread!\n");
+
+        pthread_mutex_lock(&thread_list_mutex);
+        delete_all();
+        pthread_mutex_unlock(&thread_list_mutex);
     }
 
-    printf("^C recieved by handler thread!\n");
-
-    pthread_mutex_lock(&thread_list_mutex);
-    delete_all();
-    pthread_mutex_unlock(&thread_list_mutex);
     return NULL;
 }
 

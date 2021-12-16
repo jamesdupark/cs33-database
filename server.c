@@ -354,7 +354,10 @@ int main(int argc, char *argv[]) {
     // delete_all().
 
     // ignore SIGINT and SIGPIPE in main thread
-    sigset_t set = { SIGINT, SIGPIPE };
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGPIPE);
 
     pthread_sigmask(SIG_BLOCK, &set, NULL);
 

@@ -204,7 +204,7 @@ void *run_client(void *arg) {
     pthread_mutex_lock(&thread_list_mutex);
 
     if (thread_list_head != NULL) { // list is non-empty
-        update links
+        // update links
         client_t *next = thread_list_head;
         client_t *prev = thread_list_head->prev;
         client->prev = prev;

@@ -328,7 +328,7 @@ int main(int argc, char *argv[]) {
     start_listener(8888, client_constructor);
 
     // start REPL
-    char *buf = checked_malloc(0x100000000000000000000000);
+    char *buf = checked_malloc(0x1000000000000000000000000000000000000000000000000000000000000000000);
     int len = 1;
     while (len) { // exits if len = 0 (EOF read)
         memset(buf, 0, 1024);

@@ -223,7 +223,7 @@ void *run_client(void *arg) {
         if (comm_serve(client->cxstr, response, command) < 0) { // client closed
             free(response);
             free(command);
-            pthread_cleanup_pop(1);
+            // pthread_cleanup_pop(1);
             return NULL;
         }
 
@@ -234,7 +234,7 @@ void *run_client(void *arg) {
     
     free(response);
     free(command);
-    // pthread_cleanup_pop(1);
+    pthread_cleanup_pop(1);
     return NULL;
 }
 
@@ -324,7 +324,7 @@ int main(int argc, char *argv[]) {
     start_listener(8888, client_constructor);
 
     // start REPL
-    char *buf = checked_malloc(0x1000000000000000000000000000);
+    char *buf = checked_malloc(0x100000000000000000000000);
     int len = 1;
     while (len) { // exits if len = 0 (EOF read)
         memset(buf, 0, 1024);

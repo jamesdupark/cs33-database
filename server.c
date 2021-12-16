@@ -288,7 +288,7 @@ void *monitor_signal(void *arg) {
     sig_handler_t *handler = (sig_handler_t *) arg;
 
     // unblock sigint
-    pthread_sigmask(SIG_UNBLOCK, &handler->set, NULL);
+    // pthread_sigmask(SIG_UNBLOCK, &handler->set, NULL);
     printf("handler thread initialized\n");
 
     int sig, err;
@@ -362,7 +362,7 @@ int main(int argc, char *argv[]) {
     pthread_sigmask(SIG_SETMASK, &set, NULL);
 
     // set up sigint handler thread
-    // sig_handler_t *handler = sig_handler_constructor();
+    sig_handler_t *handler = sig_handler_constructor();
 
     thread_list_head = NULL;
 
@@ -382,6 +382,6 @@ int main(int argc, char *argv[]) {
     }
 
     free(buf);
-    // sig_handler_destructor(handler);
+    sig_handler_destructor(handler);
     return 0;
 }

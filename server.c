@@ -328,7 +328,7 @@ void sig_handler_destructor(sig_handler_t *sighandler) {
     // TODO: Free any resources allocated in sig_handler_constructor.
     // Cancel and join with the signal handler's thread.
 
-    sigemptyset(&handler->set);
+    sigemptyset(&sighandler->set);
 
     pthread_cancel(sighandler->thread);
     pthread_join(sighandler->thread, NULL);
@@ -354,9 +354,9 @@ int main(int argc, char *argv[]) {
     // delete_all().
 
     // ignore SIGINT and SIGPIPE in main thread
-    sigset_t set = {SIGINT, SIGPIPE};
+    sigset_t set = { SIGINT, SIGPIPE };
 
-    pthread_sigmask(SIG_BLOCK, set, NULL);
+    pthread_sigmask(SIG_BLOCK, &set, NULL);
 
     // set up sigint handler thread
     sig_handler_t *handler = sig_handler_constructor();

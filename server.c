@@ -221,10 +221,7 @@ void *run_client(void *arg) {
     while (1) {
         // read commands in?
         if (comm_serve(client->cxstr, response, command) < 0) { // client closed
-            free(response);
-            free(command);
-            // pthread_cleanup_pop(1);
-            return NULL;
+            break;
         }
 
         // attempts to interpret command, set a response

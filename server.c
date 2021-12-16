@@ -374,6 +374,6 @@ int main(int argc, char *argv[]) {
     }
 
     free(buf);
-    sig_handler_destructor(sig_handler);
+    sig_handler_destructor(handler);
     return 0;
 }

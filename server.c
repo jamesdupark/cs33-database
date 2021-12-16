@@ -327,7 +327,7 @@ void sig_handler_destructor(sig_handler_t *sighandler) {
     // Cancel and join with the signal handler's thread.
 
     pthread_cancel(sighandler->thread);
-    pthread_join(sighandler->thread);
+    pthread_join(sighandler->thread, NULL);
 
 }
 
@@ -354,7 +354,7 @@ int main(int argc, char *argv[]) {
     signal(SIGPIPE, SIG_IGN);
 
     // set up sigint handler thread
-    sig_handler_t handler = sig_handler_constructor();
+    sig_handler_t *handler = sig_handler_constructor();
 
     thread_list_head = NULL;
 

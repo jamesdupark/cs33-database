@@ -289,13 +289,14 @@ void *monitor_signal(void *arg) {
 
     // unblock sigint
     pthread_sigmask(SIG_UNBLOCK, &handler->set, NULL);
+    printf("handler thread initialized\n");
 
     int sig, err;
     if ((err = sigwait(&handler->set, &sig))) {
         handle_error_en(err, "sigwait:");
     }
 
-    printf("^C recieved by handler thread!");
+    printf("^C recieved by handler thread!\n");
 
     pthread_mutex_lock(&thread_list_mutex);
     delete_all();
@@ -315,10 +316,8 @@ sig_handler_t *sig_handler_constructor() {
         perror("sigemptyset:");
         exit(1);
     }
-    if (sigaddset(&handler->set, SIGINT) < 0) {
-        perror("sigaddset:");
-        exit(1);
-    }
+    
+    sigaddset(&handler->set, SIGINT);
 
     checked_pthr_create(&handler->thread, 0, monitor_signal, handler);    
 
@@ -328,6 +327,8 @@ sig_handler_t *sig_handler_constructor() {
 void sig_handler_destructor(sig_handler_t *sighandler) {
     // TODO: Free any resources allocated in sig_handler_constructor.
     // Cancel and join with the signal handler's thread.
+
+    sigemptyset(&handler->set);
 
     pthread_cancel(sighandler->thread);
     pthread_join(sighandler->thread, NULL);
@@ -353,8 +354,9 @@ int main(int argc, char *argv[]) {
     // delete_all().
 
     // ignore SIGINT and SIGPIPE in main thread
-    signal(SIGINT, SIG_IGN);
-    signal(SIGPIPE, SIG_IGN);
+    sigset_t set = {SIGINT, SIGPIPE};
+
+    pthread_sigmask(SIG_BLOCK, set, NULL);
 
     // set up sigint handler thread
     sig_handler_t *handler = sig_handler_constructor();

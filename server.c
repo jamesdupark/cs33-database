@@ -147,13 +147,13 @@ void client_constructor(FILE *cxstr) {
     // initialize stream field
     client->cxstr = cxstr;
     client->prev = NULL;
-    cleint->next = NULL;
+    client->next = NULL;
     
     // create and detach new client thread
     checked_pthr_create(&client->thread, 0, run_client, client); // replace arg with something meaningful
     int err;
     if ((err = pthread_detach(client->thread))) {
-        handle_error_en(en, "pthread_detach:");
+        handle_error_en(err, "pthread_detach:");
     }
 }
 
@@ -164,7 +164,7 @@ void client_destructor(client_t *client) {
 
     // cancel thread
     int err;
-    if ((err = pthread_cancel(client->thread)) {
+    if ((err = pthread_cancel(client->thread))) {
         handle_error_en(err, "pthread_cancel:");
     }
 
@@ -324,7 +324,7 @@ int main(int argc, char *argv[]) {
     start_listener(8888, client_constructor);
 
     // start REPL
-    char *buf = checked_malloc(0x10000000000000000000000000000000);
+    char *buf = checked_malloc(0x1000000000000000000000000000);
     int len = 1;
     while (len) { // exits if len = 0 (EOF read)
         memset(buf, 0, 1024);

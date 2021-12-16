@@ -317,7 +317,7 @@ sig_handler_t *sig_handler_constructor() {
         exit(1);
     }
 
-    checked_pthr_create(handler->thread, 0, monitor_signal, handler);    
+    checked_pthr_create(&handler->thread, 0, monitor_signal, handler);    
 
     return handler;
 }

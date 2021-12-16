@@ -359,7 +359,7 @@ int main(int argc, char *argv[]) {
     sigaddset(&set, SIGINT);
     sigaddset(&set, SIGPIPE);
 
-    pthread_sigmask(SIG_BLOCK, &set, NULL);
+    pthread_sigmask(SIG_SETMASK, &set, NULL);
 
     // set up sigint handler thread
     sig_handler_t *handler = sig_handler_constructor();

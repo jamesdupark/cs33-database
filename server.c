@@ -334,7 +334,7 @@ void sig_handler_destructor(sig_handler_t *sighandler) {
 
     pthread_cancel(sighandler->thread);
     pthread_join(sighandler->thread, NULL);
-
+    free(sighandler);
 }
 
 // The arguments to the server should be the port number.

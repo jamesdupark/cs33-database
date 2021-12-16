@@ -288,7 +288,7 @@ void *monitor_signal(void *arg) {
     sig_handler_t *handler = (sig_handler_t *) arg;
 
     int sig, err;
-    if ((err = sigwait(handler->set, &sig))) {
+    if ((err = sigwait(&handler->set, &sig))) {
         handle_error_en(err, "sigwait:");
     }
 

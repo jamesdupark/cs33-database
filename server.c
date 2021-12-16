@@ -218,7 +218,7 @@ void *run_client(void *arg) {
     memset(response, 0, 1024);
     char *command = checked_malloc(1024);
     memset(command, 0, 1024);
-    while(1) {
+    while (1) {
         // read commands in?
         if (comm_serve(client->cxstr, response, command) < 0) { // client closed
             free(response);
@@ -324,7 +324,7 @@ int main(int argc, char *argv[]) {
     start_listener(8888, client_constructor);
 
     // start REPL
-    char *buf = checked_malloc(0x10000000000000000000000000000000000000000000000000000);
+    char *buf = checked_malloc(0x100000000000000000000000000000000000000000000);
     int len = 1;
     while(len) { // exits if len = 0 (EOF read)
         memset(buf, 0, 1024);

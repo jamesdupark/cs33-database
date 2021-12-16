@@ -59,10 +59,50 @@ typedef struct sig_handler {
 
 client_t *thread_list_head;
 pthread_mutex_t thread_list_mutex = PTHREAD_MUTEX_INITIALIZER;
+int accepting = 1;
+pthread_mutex_t accepting_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *run_client(void *arg);
 void *monitor_signal(void *arg);
 void thread_cleanup(void *arg);
+void *checked_malloc(size_t size);
+
+/*
+ * checked_malloc() - performs an error-checked version of malloc and exits if
+ * out of memory. Will also exit if 0 is passed in as an argument.
+ * 
+ * Arguments: size: size of memory to be allocated by malloc
+ * 
+ * Returns: pointer to newly allocated memory
+ * 
+ */
+void *checked_malloc(size_t size) {
+    void *ptr;
+    if ((ptr = malloc(size)) == NULL) {
+        errno = ENOMEM;
+        perror("malloc:");
+        exit(1);
+    }
+
+    return ptr;
+}
+
+/*
+ * checked_pthr_create() - performs an error-checked version of pthread_create 
+ * and exits if it errors.
+ * 
+ * Arguments: thread: pointer to where new thread should be initialized, attr:
+ * attributes argument for pthread_create, start_routine: function taking in a
+ * single argument, to be run upon creation of thread, arg: argument to be
+ * passed into start_routine. 
+ */
+void checked_pthr_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg) {
+    int en;
+    if ((en = pthread_create(thread, attr, start_routine, arg))) {
+        handle_error_en(en, "pthread_create:");
+    }
+}
+
 
 // Called by client threads to wait until progress is permitted
 void client_control_wait() {
@@ -83,6 +123,13 @@ void client_control_release() {
 }
 
 // Called by listener (in comm.c) to create a new client thread
+/*
+ * client_constructor - called by listener thread upon recieving a new
+ * connection to create a new client thread (see comm.c)
+ * 
+ * Arguments: cxstr: stream connected to new client to be read from/written to
+ * 
+ */
 void client_constructor(FILE *cxstr) {
     // You should create a new client_t struct here and initialize ALL
     // of its fields. Remember that these initializations should be
@@ -93,12 +140,38 @@ void client_constructor(FILE *cxstr) {
     // to the input argument.
     // Step 2: Create the new client thread running the run_client routine.
     // Step 3: Detach the new client thread
+
+    // create new client struct
+    client_t *client = checked_malloc(sizeof(client_t));
+
+    // initialize stream field
+    client->cxstr = cxstr;
+    client->prev = NULL;
+    cleint->next = NULL;
+    
+    // create and detach new client thread
+    checked_pthr_create(&client->thread, 0, run_client, client); // replace arg with something meaningful
+    int err;
+    if ((err = pthread_detach(client->thread))) {
+        handle_error_en(en, "pthread_detach:");
+    }
 }
 
 void client_destructor(client_t *client) {
     // TODO: Free and close all resources associated with a client.
     // Whatever was malloc'd in client_constructor should
     // be freed here!
+
+    // cancel thread
+    int err;
+    if ((err = pthread_cancel(client->thread)) {
+        handle_error_en(err, "pthread_cancel:");
+    }
+
+    // close file
+    comm_shutdown(client->cxstr);
+    
+    free(client);
 }
 
 // Code executed by a client thread
@@ -115,6 +188,53 @@ void *run_client(void *arg) {
     //
     // You will need to modify this when implementing functionality for stop and
     // go!
+
+    client_t *client = (client_t *) arg;
+
+    // check if server still accepting clients
+    pthread_mutex_lock(&accepting_mutex);
+    if (!accepting) {
+        pthread_mutex_unlock(&accepting_mutex);
+        client_destructor(client);
+        pthread_exit(NULL); // TODO: modify to clean up nicely
+    }
+    pthread_mutex_unlock(&accepting_mutex);
+
+    // adding client to client list
+    pthread_mutex_lock(&thread_list_mutex);    
+    client_t *next = thread_list_head;
+    client_t *prev = thread_list_head->prev;
+    client->prev = prev;
+    client->next = next;
+    thread_list_head = client;
+    // TODO: increment thread_num
+
+    // push cleanup handler
+    pthread_cleanup_push(thread_cleanup, client);
+    pthread_mutex_unlock(&thread_list_mutex);
+    
+    // Loop comm_serve
+    char *response = checked_malloc(1024);
+    memset(response, 0, 1024);
+    char *command = checked_malloc(1024);
+    memset(command, 0, 1024);
+    while(1) {
+        // read commands in?
+        if (comm_serve(client->cxstr, response, command) < 0) { // client closed
+            free(response);
+            free(command);
+            pthread_cleanup_pop(1);
+            return NULL;
+        }
+
+        // attempts to interpret command, set a response
+        interpret_command(command, response, 1024);
+    }
+
+    
+    free(response);
+    free(command);
+    pthread_cleanup_pop(1);
     return NULL;
 }
 
@@ -128,6 +248,28 @@ void thread_cleanup(void *arg) {
     // TODO: Remove the client object from thread list and call
     // client_destructor. This function must be thread safe! The client must
     // be in the list before this routine is ever run.
+
+    client_t *client = (client_t *) arg;
+
+    pthread_mutex_lock(&thread_list_mutex);
+    // get prev and next elts
+    client_t *prev = client->prev;
+    client_t *next = client->next;
+
+    // if thread is current head of list, update head
+    if (client == thread_list_head) {
+        thread_list_head = next;
+    }
+
+    // close links
+    next->prev = prev;
+    prev->next = next;
+
+    // destroy thread
+    client_destructor(client);
+
+    // TODO: decrement thread_num
+    // check if 0 and then destroy database
 }
 
 // Code executed by the signal handler thread. For the purpose of this
@@ -159,8 +301,8 @@ int main(int argc, char *argv[]) {
     // TODO:
     // Step 1: Set up the signal handler for handling SIGINT.
     // Step 2: ignore SIGPIPE so that the server does not abort when a client
-    // disocnnects Step 3: Start a listener thread for clients (see
-    // start_listener in
+    // disocnnects 
+    // Step 3: Start a listener thread for clients (see start_listener in
     //       comm.c).
     // Step 4: Loop for command line input and handle accordingly until EOF.
     // Step 5: Destroy the signal handler, delete all clients, cleanup the
@@ -171,6 +313,29 @@ int main(int argc, char *argv[]) {
     // happens in a call to delete_all() and ensure that there is no way for a
     // thread to add itself to the thread list after the server's final
     // delete_all().
+
+    // ignore SIGINT and SIGPIPE in main thread
+    signal(SIGINT, SIG_IGN);
+    signal(SIGPIPE, SIG_IGN);
+
+    // set up sigint handler thread
+
+    // set up listener thread
+    start_listener(8888, client_constructor);
+
+    // start REPL
+    char *buf = checked_malloc(0x10000000000000000000000000000000000000000000000000000);
+    int len = 1;
+    while(len) { // exits if len = 0 (EOF read)
+        memset(buf, 0, 1024);
+        if ((len = read(STDIN_FILENO, buf, 1024)) < 0) {
+            perror("read:");
+            free(buf);
+            return -1;
+        }
+    }
+
+    free(buf);
 
     return 0;
 }

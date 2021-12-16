@@ -1,13 +1,52 @@
 Questions
 
 1. Consider the thread created in start_listener. How many threads with this functionality should be running on the server at any given time?
+Start_listener starts the listener thread which listens for new client connections and sets up threads
+for each client. Thus, only one such thread should be running on a server at any given time.
 
 2. In the listener function, what do each of the following fields of the sockaddr_in struct represent: sin_family, sin_port, and sin_addr.s_addr?
+The sin_family field represents the type of socket connection that is being made (i.e. AF_INET for IPv4 communication,
+AF_UNIX for interprocess communication on the same machine). The sin_port field represents the port that the server
+is listening on; this is the port that client connections should attempt to connect to. Finally, the sin_addr.s_addr
+field represents the IP addresses that the socket will accept connections on. This is set to INADDR_ANY to accept
+connections from any IP address.
 
 3. What is the purpose of each of the following function calls in listener: socket, bind, listen, and accept? You should explain what each call does and what the effect would be if it were not called.
+The socket function attempts to create a socket with the given family and protocol (i.e. internet stream socket)
+and returns a file descriptor representing that socket if successful. Without calling this function, there would
+be no socket to read from/write to, and the lsock file descriptor would remain uninitialized.
+The bind function binds a socket to a sockaddr_in struct in the local address space. This basically assigns the
+socket a location in actual memory, along with the port/address associated with the sockaddr_in struct it is bound
+to, and allows the socket to recieve connections. Without this function, the socket would be unable to accept
+connections.
+The listen function indicates to the system that the socket in question is a server-side socket. In other words,
+it indicates that the socket will be used to recieve and accept rather than make connections. Without this
+function call, the socket would be unable to accept incoming connections from clients.
+Finally, the accept function accepts new connection requests and creates a connected socket for them, then
+keeps listening. Client connections will be accepted using this call and passed to a new socket. Without this
+function, the socket would continue listening for new connections, and a queue of pending connections would build
+up, but there would never be any connections made/accepted.
 
 4. Which protocol (TCP or UDP) is used for communication? Why is this protocol used? (Hint: see line 37 in comm.c)
+We use TCP (transmission control protocol), which implements a bytestream protocol, as indicated by the SOCK_STREAM
+input when creating our listening socket. This is because TCP guarantees reliable communication, which means that
+we are guaranteed that all data sent over the network will be recieved on the other side (barring network outage,
+etc. - so guaranteeing that no spontaneous drops will occur).
 
 5. Describe what comm_serve does. How are the response and command parameters used? What would happen if the stream pointed to by cxstr were closed?
+The comm_serve funciton attempts to send and read messages from the specified socket (cxstr). The response parameter
+is a string to be sent back to the client via the socket; if this string is non-empty, then the comm_serve function
+will attempt to send the contents of response to the client via the socket. The command parameter is a buffer that
+recieves input from the socket (i.e. client commands). The comm_serve function gets whatever command has been sent
+by the client (if any) and writes it to the command buffer. If the stream pointed to by cxstr is closed, then the
+fgets/fputs calls will error and the function will print "client connnection terminated\n" and return -1.
 
 6. Describe, in detail, what happens during each iteration of the while loop in the listener function. Be sure to include explanations of all significant function calls.
+The while loop in the listener function listens for new client connections and sets up sockets for them. The first
+few lines name the new socket (fd) and sockaddr_in struct that will be created upon recieving a new connection.
+The call to accept attempts to take the first pending connection in the queue (if there is any) and create a new
+socket for it. If this errors, the loop continues; otherwise the ip address and port of the client are printed.
+The loop then attempts to open a file associated with the socket with the fdopen() call. The file is opened in
+read-write mode to enable two-way communication. Once again, if this errors, the loop continues. Otherwise, the
+function passes the newly created file to the server() function it recieved as an argument (likely client_constructor,
+as we would want to create a new client thread for this socket).

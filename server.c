@@ -146,8 +146,8 @@ void client_constructor(FILE *cxstr) {
 
     // initialize stream field
     client->cxstr = cxstr;
-    client->prev = NULL;
-    client->next = NULL;
+    client->prev = client;
+    client->next = client;
     
     // create and detach new client thread
     checked_pthr_create(&client->thread, 0, run_client, client); // replace arg with something meaningful
@@ -201,11 +201,16 @@ void *run_client(void *arg) {
     pthread_mutex_unlock(&accepting_mutex);
 
     // adding client to client list
-    pthread_mutex_lock(&thread_list_mutex);    
-    client_t *next = thread_list_head;
-    client_t *prev = thread_list_head->prev;
-    client->prev = prev;
-    client->next = next;
+    pthread_mutex_lock(&thread_list_mutex);
+
+    if (thread_list_head != NULL) { // list is non-empty
+        update links
+        client_t *next = thread_list_head;
+        client_t *prev = thread_list_head->prev;
+        client->prev = prev;
+        client->next = next;
+    }
+
     thread_list_head = client;
     // TODO: increment thread_num
 
@@ -316,6 +321,8 @@ int main(int argc, char *argv[]) {
     signal(SIGPIPE, SIG_IGN);
 
     // set up sigint handler thread
+
+    thread_list_head = NULL;
 
     // set up listener thread
     start_listener(8888, client_constructor);

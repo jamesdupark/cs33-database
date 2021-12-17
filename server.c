@@ -115,7 +115,7 @@ void client_control_wait() {
     // client_control_release(). See the client_control_t struct.
     pthread_mutex_lock(&stop_go.go_mutex);
     while (stop_go.stopped) {
-        pthread_cond_wait(&stop_go.go);
+        pthread_cond_wait(&stop_go.go, &stop_go.go_mutex);
     }
 
     pthread_mutex_unlock(&stop_go.go_mutex);    
@@ -136,7 +136,7 @@ void client_control_release() {
     // to continue. See the client_control_t struct.
     pthread_mutex_lock(&stop_go.go_mutex);
     stop_go.stopped = 0;
-    pthread_cond_broadcast(&stop_go.go, &stop_go.go_mutex);
+    pthread_cond_broadcast(&stop_go.go);
     pthread_mutex_unlock(&stop_go.go_mutex);
 }
 

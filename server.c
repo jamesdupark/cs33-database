@@ -472,7 +472,7 @@ int main(int argc, char *argv[]) {
     // clean up other threads
     sig_handler_destructor(handler);
     pthread_cancel(listener);
-    pthread_join(listener);
+    pthread_join(listener, NULL);
 
     pthread_mutex_unlock(&server_state.server_mutex);
 

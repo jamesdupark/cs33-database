@@ -174,7 +174,7 @@ void client_destructor(client_t *client) {
     // close file
     comm_shutdown(client->cxstr);
 
-    // free client    
+    // free client
     free(client);
 }
 
@@ -261,7 +261,7 @@ void delete_all() {
     // pthread_cancel function.
 
     client_t *current = thread_list_head;
-    if (current == NULL) {
+    if (current == NULL) { // empty list case - nothing to do
         return;
     }
 
@@ -271,7 +271,7 @@ void delete_all() {
         pthread_cancel(current->thread);
         current = next;
         next = current->next;
-    } while (next != thread_list_head);
+    } while (current != thread_list_head);
 }
 
 // Cleanup routine for client threads, called on cancels and exit.
@@ -385,8 +385,19 @@ int main(int argc, char *argv[]) {
     // thread to add itself to the thread list after the server's final
     // delete_all().
 
-    // ignore SIGINT and SIGPIPE in main thread
+    int port, rd_len;
     sigset_t set;
+    thread_t listener;
+    char *buf, *filename;
+
+    if (argc != 2) {
+        printf("Usage: ./server <port>\n");
+        exit(1);
+    } else {
+        port = atoi(argv[1]);
+    }
+
+    // ignore SIGINT and SIGPIPE in main thread
     sigemptyset(&set);
     sigaddset(&set, SIGINT);
     sigaddset(&set, SIGPIPE);
@@ -399,20 +410,19 @@ int main(int argc, char *argv[]) {
     thread_list_head = NULL;
 
     // set up listener thread
-    start_listener(8888, client_constructor);
+    listener = start_listener(port, client_constructor);
 
     // start REPL
-    char *buf = checked_malloc(1024);
-    int len = 1;
-    while (len) { // exits if len = 0 (EOF read)
+    buf = checked_malloc(1024);
+    rd_len = 1;
+    while (rd_len) { // exits if len = 0 (EOF read)
         memset(buf, 0, 1024);
-        if ((len = read(STDIN_FILENO, buf, 1024)) < 0) {
+        if ((rd_len = read(STDIN_FILENO, buf, 1024)) < 0) {
             perror("read:");
             free(buf);
             return -1;
         }
 
-        char *filename;
         switch (buf[0]) {
             case 's':
                 // stop
@@ -429,8 +439,12 @@ int main(int argc, char *argv[]) {
             case 'p':
                 //print
                 filename = strtok((buf + 1), " \t");
-                size_t len = strlen(filename);
-                filename[len - 1] = '\0';
+                size_t len = strlen(filename); 
+                
+                // get rid of trailing newline
+                if (filename[len - 1] == '\n') {
+                    filename[len - 1] = '\0';
+                }
                 db_print(filename);
                 continue;
         }
@@ -447,12 +461,23 @@ int main(int argc, char *argv[]) {
         pthread_cond_wait(&server_state.server_cond, &server_state.server_mutex);
     }
 
+    assert(server_state.num_threads == 0);
+    assert(thread_list_head == NULL);
+
     printf("cond var released\n");
+
+    // clean up db
+    db_cleanup();
+    
+    // clean up other threads
+    sig_handler_destructor(handler);
+    pthread_cancel(listener);
+    pthread_Join(listener);
+
     pthread_mutex_unlock(&server_state.server_mutex);
 
     // clean up resources
     free(buf);
-    sig_handler_destructor(handler);
-    printf("exiting database\n"); // TODO: remove
+    printf("exiting database\n");
     return 0;
 }

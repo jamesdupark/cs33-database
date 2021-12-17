@@ -173,7 +173,8 @@ void client_destructor(client_t *client) {
 
     // close file
     comm_shutdown(client->cxstr);
-    
+
+    // free client    
     free(client);
 }
 
@@ -269,7 +270,9 @@ void thread_cleanup(void *arg) {
     client_t *next = client->next;
 
     // if thread is current head of list, update head
-    if (client == thread_list_head) {
+    if (next == client) {
+        thread_list_head = NULL;
+    } else if (client == thread_list_head) {
         thread_list_head = next;
     }
 
@@ -399,7 +402,7 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "releasing all clients\n");
                 continue;
 
-            case 'p': ;
+            case 'p':
                 //print
                 filename = strtok((buf + 1), " \t");
                 db_print(filename);

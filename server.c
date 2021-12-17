@@ -280,6 +280,7 @@ void thread_cleanup(void *arg) {
     // close links
     next->prev = prev;
     prev->next = next;
+    pthread_mutex_unlock(&thread_list_mutex);
 
     // destroy thread
     client_destructor(client);

@@ -287,6 +287,8 @@ void thread_cleanup(void *arg) {
 
     // TODO: decrement thread_num
     // check if 0 and then destroy database
+
+    pthread_exit(NULL);
 }
 
 // Code executed by the signal handler thread. For the purpose of this
@@ -396,6 +398,6 @@ int main(int argc, char *argv[]) {
     // clean up resources
     free(buf);
     sig_handler_destructor(handler);
-    printf("exiting main thread");
+    printf("exiting main thread\n");
     return 0;
 }

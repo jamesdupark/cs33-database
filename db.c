@@ -76,11 +76,9 @@ void db_query(char *name, char *result, int len) {
 
     if (target == 0) {
         snprintf(result, len, "not found");
-        pthread_rwlock_unlock(&parent->lock);
         return;
     } else {
         snprintf(result, len, "%s", target->value);
-        pthread_rwlock_unlock(&parent->lock);
         pthread_rwlock_unlock(&target->lock);
         return;
     }

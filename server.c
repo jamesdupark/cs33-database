@@ -385,6 +385,7 @@ int main(int argc, char *argv[]) {
             return -1;
         }
 
+        char *filename;
         switch (buf[0]) {
             case 's':
                 // stop
@@ -398,9 +399,8 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "releasing all clients\n");
                 continue;
 
-            case 'p':
+            case 'p': ;
                 //print
-                char *filename;
                 filename = strtok((buf + 1), " \t");
                 db_print(filename);
                 continue;

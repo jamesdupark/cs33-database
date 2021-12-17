@@ -62,7 +62,7 @@ pthread_mutex_t thread_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 int accepting = 1;
 pthread_mutex_t accepting_mutex = PTHREAD_MUTEX_INITIALIZER;
 server_control_t server_state = { PTHREAD_MUTEX_INITIALIZER, 
-                                  PTHREAD_COND_INITIALIZER, 0 }
+                                  PTHREAD_COND_INITIALIZER, 0 };
 
 void *run_client(void *arg);
 void *monitor_signal(void *arg);
@@ -400,8 +400,8 @@ int main(int argc, char *argv[]) {
 
             case 'p':
                 //print
-                char *filename = strtok((buf + 1), ' \t');
-                db_print()
+                char *filename = strtok((buf + 1), " \t");
+                db_print(filename);
                 continue;
         }
     }

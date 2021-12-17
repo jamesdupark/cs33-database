@@ -440,8 +440,11 @@ int main(int argc, char *argv[]) {
     pthread_mutex_lock(&server_state.server_mutex);
     accepting = 0;
     while(server_state.num_client_threads > 0) {
+        printf("waiting on cond var\n");
         pthread_cond_wait(&server_state.server_cond, &server_state.server_mutex);
     }
+
+    printf("cond var released\n");
 
     pthread_mutex_lock(&thread_list_mutex);
     delete_all();
@@ -451,6 +454,6 @@ int main(int argc, char *argv[]) {
     // clean up resources
     free(buf);
     sig_handler_destructor(handler);
-    printf("exiting main thread\n"); // TODO: remove
+    printf("exiting database\n"); // TODO: remove
     return 0;
 }

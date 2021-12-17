@@ -203,13 +203,12 @@ void *run_client(void *arg) {
     client_t *client = (client_t *) arg;
 
     // check if server still accepting clients
-    pthread_mutex_lock(&accepting_mutex);
+    pthread_mutex_lock(&server_state.server_mutex);
     if (!accepting) {
-        pthread_mutex_unlock(&accepting_mutex);
+        pthread_mutex_unlock(&server_state.server_mutex);
         client_destructor(client);
         pthread_exit(NULL); // TODO: modify to clean up nicely
     }
-    pthread_mutex_unlock(&accepting_mutex);
 
     // adding client to client list
     pthread_mutex_lock(&thread_list_mutex);
@@ -230,7 +229,10 @@ void *run_client(void *arg) {
 
     thread_list_head = client;
     // TODO: increment thread_num
+    server_state.num_client_threads++;
+
     pthread_mutex_unlock(&thread_list_mutex);
+    pthread_mutex_unlock(&server_state.server_mutex);
 
     // push cleanup handler
     pthread_cleanup_push(thread_cleanup, client);
@@ -260,6 +262,19 @@ void *run_client(void *arg) {
 void delete_all() {
     // TODO: Cancel every thread in the client thread list with the
     // pthread_cancel function.
+
+    client_t *current = thread_list_head;
+    if (current == NULL) {
+        return;
+    }
+
+    client_t *next = thread_list_head->next;
+
+    do {
+        pthread_cancel(current->thread);
+        current = next;
+        next = current->next;
+    } while (next != thread_list_head)
 }
 
 // Cleanup routine for client threads, called on cancels and exit.
@@ -292,6 +307,12 @@ void thread_cleanup(void *arg) {
 
     // TODO: decrement thread_num
     // check if 0 and then destroy database
+    pthread_mutex_lock(&server_state.server_mutex);
+    server_state.num_client_threads -= 1;
+    if (num_threads == 0) {
+        pthread_cond_broadcast(&server_state.server_cond);
+    }
+    pthread_mutex_unlock(&server_state.server_mutex);
 }
 
 // Code executed by the signal handler thread. For the purpose of this
@@ -417,6 +438,18 @@ int main(int argc, char *argv[]) {
                 continue;
         }
     }
+
+    // wait on server condition variable
+    pthread_mutex_lock(&server_state.server_mutex);
+    accepting = 0;
+    while(num_threads > 0) {
+        pthread_cond_wait(&server_state.server_cond, &server_state.server_mutex);
+    }
+
+    pthread_mutex_lock(&thread_list_mutex);
+    delete_all();
+    pthread_mutex_unlock(&thread_list_mutex);
+    pthread_mutex_unlock(&server->state->server_mutex);
 
     // clean up resources
     free(buf);

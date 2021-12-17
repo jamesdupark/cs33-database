@@ -253,6 +253,8 @@ void db_print_recurs(node_t *node, int lvl, FILE *out) {
         return;
     }
 
+    pthread_rwlock_rdlock(&node->lock);
+
     if (node == &head) {
         fprintf(out, "(root)\n");
     } else {
@@ -261,11 +263,13 @@ void db_print_recurs(node_t *node, int lvl, FILE *out) {
 
     db_print_recurs(node->lchild, lvl + 1, out);
     db_print_recurs(node->rchild, lvl + 1, out);
+    pthread_rwlock_unlock(&node->lock);
 }
 
 int db_print(char *filename) {
     FILE *out;
     if (filename == NULL) {
+        pthread_rwlock_rdlock(&head.lock);
         db_print_recurs(&head, 0, stdout);
         return 0;
     }
@@ -276,6 +280,7 @@ int db_print(char *filename) {
     }
 
     if (*filename == '\0') {
+        pthread_rwlock_rdlock(&head.lock);
         db_print_recurs(&head, 0, stdout);
         return 0;
     }
@@ -284,6 +289,7 @@ int db_print(char *filename) {
         return -1;
     }
 
+    pthread_rwlock_rdlock(&head.lock);
     db_print_recurs(&head, 0, out);
     fclose(out);
 

@@ -61,6 +61,8 @@ client_t *thread_list_head;
 pthread_mutex_t thread_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 int accepting = 1;
 pthread_mutex_t accepting_mutex = PTHREAD_MUTEX_INITIALIZER;
+server_control_t server_state = { PTHREAD_MUTEX_INITIALIZER, 
+                                  PTHREAD_COND_INITIALIZER, 0 }
 
 void *run_client(void *arg);
 void *monitor_signal(void *arg);
@@ -281,8 +283,6 @@ void thread_cleanup(void *arg) {
 
     // TODO: decrement thread_num
     // check if 0 and then destroy database
-
-    pthread_exit(NULL);
 }
 
 // Code executed by the signal handler thread. For the purpose of this
@@ -298,16 +298,13 @@ void *monitor_signal(void *arg) {
 
     sig_handler_t *handler = (sig_handler_t *) arg;
 
-    // unblock sigint
-    printf("handler thread initialized\n");
-
     int sig, err;
     while (1) {
         if ((err = sigwait(&handler->set, &sig))) {
             handle_error_en(err, "sigwait:");
         }
 
-        printf("^C recieved by handler thread!\n");
+        printf("^C recieved by handler thread!\n"); // TODO: remove
 
         pthread_mutex_lock(&thread_list_mutex);
         delete_all();
@@ -387,11 +384,31 @@ int main(int argc, char *argv[]) {
             free(buf);
             return -1;
         }
+
+        switch (buf[0]) {
+            case 's':
+                // stop
+
+                fprintf(stderr, "stopping all clients\n");
+                continue;
+            
+            case 'g':
+                // go
+
+                fprintf(stderr, "releasing all clients\n");
+                continue;
+
+            case 'p':
+                //print
+                char *filename = strtok((buf + 1), ' \t');
+                db_print()
+                continue;
+        }
     }
 
     // clean up resources
     free(buf);
     sig_handler_destructor(handler);
-    printf("exiting main thread\n");
+    printf("exiting main thread\n"); // TODO: remove
     return 0;
 }

@@ -109,10 +109,13 @@ void checked_pthr_create(pthread_t *thread, const pthread_attr_t *attr,
 }
 
 
-// Called by client threads to wait until progress is permitted
+/* 
+ * client_control_wait - called by client threads in run_client each loop.
+ * checks whether the server has stopped client thread execution, and blocks the
+ * thread on the client control's conditional variable if it has. Waits until
+ * the "go" signal is sent by client_control_release
+ */
 void client_control_wait() {
-    // TODO: Block the calling thread until the main thread calls
-    // client_control_release(). See the client_control_t struct.
     pthread_mutex_lock(&stop_go.go_mutex);
     pthread_cleanup_push((void (*)(void *)) pthread_mutex_unlock, &stop_go.go_mutex);
     while (stop_go.stopped) {
@@ -122,26 +125,29 @@ void client_control_wait() {
     pthread_cleanup_pop(1);
 }
 
-// Called by main thread to stop client threads
+/*
+ * client_control_stop - called when "s" is read in from STDIN in the server
+ * REPL. Pauses but does not terminate execution of all client threads by
+ * setting the client control struct's stopped flag to 1.
+ */
 void client_control_stop() {
-    // TODO: Ensure that the next time client threads call client_control_wait()
-    // at the top of the event loop in run_client, they will block.
     pthread_mutex_lock(&stop_go.go_mutex);
     stop_go.stopped = 1;
     pthread_mutex_unlock(&stop_go.go_mutex);
 }
 
-// Called by main thread to resume client threads
+/*
+ * client_control_release - called when "g" is read from STDIN in the server
+ * REPL. Resumes execution of all client threads by setting the stopped flag to
+ * 0 and broadcasting on the client control struct's cond variable.
+ */
 void client_control_release() {
-    // TODO: Allow clients that are blocked within client_control_wait()
-    // to continue. See the client_control_t struct.
     pthread_mutex_lock(&stop_go.go_mutex);
     stop_go.stopped = 0;
     pthread_cond_broadcast(&stop_go.go);
     pthread_mutex_unlock(&stop_go.go_mutex);
 }
 
-// Called by listener (in comm.c) to create a new client thread
 /*
  * client_constructor - called by listener thread upon recieving a new
  * connection to create a new client thread (see comm.c)
@@ -150,16 +156,6 @@ void client_control_release() {
  * 
  */
 void client_constructor(FILE *cxstr) {
-    // You should create a new client_t struct here and initialize ALL
-    // of its fields. Remember that these initializations should be
-    // error-checked.
-    //
-    // TODO:
-    // Step 1: Allocate memory for a new client and set its connection stream
-    // to the input argument.
-    // Step 2: Create the new client thread running the run_client routine.
-    // Step 3: Detach the new client thread
-
     // create new client struct
     client_t *client = checked_malloc(sizeof(client_t));
 
@@ -169,7 +165,7 @@ void client_constructor(FILE *cxstr) {
     client->next = client;
     
     // create and detach new client thread
-    checked_pthr_create(&client->thread, 0, run_client, client); // replace arg with something meaningful
+    checked_pthr_create(&client->thread, 0, run_client, client);
     int err;
     if ((err = pthread_detach(client->thread))) {
         handle_error_en(err, "pthread_detach:");
@@ -183,10 +179,6 @@ void client_constructor(FILE *cxstr) {
  * Arguments - client: pointer to the client object to be destroyed
  */
 void client_destructor(client_t *client) {
-    // TODO: Free and close all resources associated with a client.
-    // Whatever was malloc'd in client_constructor should
-    // be freed here!
-
     // close file
     comm_shutdown(client->cxstr);
 
@@ -203,34 +195,24 @@ void client_destructor(client_t *client) {
  * client.
  */
 void *run_client(void *arg) {
-    // TODO:
-    // Step 1: Make sure that the server is still accepting clients. This will
-    //         will make sense when handling EOF for the server.
-    // Step 2: Add client to the client list and push thread_cleanup to remove
-    //       it if the thread is canceled.
-    // Step 3: Loop comm_serve (in comm.c) to receive commands and output
-    //       responses. Execute commands using interpret_command (in db.c)
-    // Step 4: When the client is done sending commands, exit the thread
-    //       cleanly.
-    //
-    // You will need to modify this when implementing functionality for stop and
-    // go!
-
+    // cast arg
     client_t *client = (client_t *) arg;
 
     // check if server still accepting clients
     pthread_mutex_lock(&server_state.server_mutex);
     if (!accepting) {
         pthread_mutex_unlock(&server_state.server_mutex);
+
+        // we don't call thread_cleanup because thread isn't in list
         client_destructor(client);
-        pthread_exit(NULL); // TODO: modify to clean up nicely
+        pthread_exit(NULL);
     }
 
     // adding client to client list
     pthread_mutex_lock(&thread_list_mutex);
 
     if (thread_list_head != NULL) { // list is non-empty
-        // update links
+        // get links to update
         client_t *next = thread_list_head;
         client_t *prev = thread_list_head->prev;
         
@@ -243,8 +225,10 @@ void *run_client(void *arg) {
         prev->next = client;
     }
 
+    // update head (covers both empty and non-empty list cases)
     thread_list_head = client;
-    // TODO: increment thread_num
+    
+    // increment thread_num
     server_state.num_client_threads++;
 
     pthread_mutex_unlock(&thread_list_mutex);
@@ -263,7 +247,8 @@ void *run_client(void *arg) {
         client_control_wait();
 
         // read commands in
-        if (comm_serve(client->cxstr, response, command) < 0) { // client closed
+        if (comm_serve(client->cxstr, response, command) < 0) {
+            // exit loop if client terminated
             break;
         }
 
@@ -275,15 +260,19 @@ void *run_client(void *arg) {
     return NULL;
 }
 
+/*
+ * delete_all - loops through the thread list and calls pthread_cancel on each
+ * thread. Must be called with thread_list_mutex locked.
+ */
 void delete_all() {
-    // TODO: Cancel every thread in the client thread list with the
-    // pthread_cancel function.
-
     client_t *current = thread_list_head;
-    if (current == NULL) { // empty list case - nothing to do
+    
+    // empty list case - nothing to do
+    if (current == NULL) {
         return;
     }
 
+    // get next node
     client_t *next = thread_list_head->next;
 
     do {
@@ -293,11 +282,14 @@ void delete_all() {
     } while (current != thread_list_head);
 }
 
-// Cleanup routine for client threads, called on cancels and exit.
+/*
+ * thread_cleanup - cleanup handler for client threads - removes client from
+ * thread_list and destroys client. Client must be in thread_list when this
+ * function is called.
+ * 
+ * Arguments - arg: pointer to client_t struct to remove and destroy.
+ */
 void thread_cleanup(void *arg) {
-    // TODO: Remove the client object from thread list and call
-    // client_destructor. This function must be thread safe! The client must
-    // be in the list before this routine is ever run.
 
     client_t *client = (client_t *) arg;
 
@@ -306,7 +298,7 @@ void thread_cleanup(void *arg) {
     client_t *prev = client->prev;
     client_t *next = client->next;
 
-    // if thread is current head of list, update head
+    // update head
     if (next == client) { // edge case - client is last element in list
         thread_list_head = NULL;
     } else {
@@ -321,36 +313,37 @@ void thread_cleanup(void *arg) {
     client_destructor(client);
     pthread_mutex_unlock(&thread_list_mutex);
 
-    // TODO: decrement thread_num
-    // check if 0 and then destroy database
+    // decrement thread_num
     pthread_mutex_lock(&server_state.server_mutex);
     server_state.num_client_threads -= 1;
+    
+    // resumes shutdown if thread_num = 0 and server is waiting on cond variable
     if (server_state.num_client_threads == 0) {
         pthread_cond_broadcast(&server_state.server_cond);
     }
     pthread_mutex_unlock(&server_state.server_mutex);
 }
 
-// Code executed by the signal handler thread. For the purpose of this
-// assignment, there are two reasonable ways to implement this.
-// The one you choose will depend on logic in sig_handler_constructor.
-// 'man 7 signal' and 'man sigwait' are both helpful for making this
-// decision. One way or another, all of the server's client threads
-// should terminate on SIGINT. The server (this includes the listener
-// thread) should not, however, terminate on SIGINT!
+/*
+ * monitor_signal - function executed by signal handler thread to catch and
+ * process SIGINT. Waits for SIGINt and then cancels all current threads with
+ * delete_all
+ * 
+ * Arguments: arg: pointer to sighandler_t struct containing the set of signals
+ * (just SIGINT in this case) to wait for
+ */
 void *monitor_signal(void *arg) {
-    // TODO: Wait for a SIGINT to be sent to the server process and cancel
-    // all client threads when one arrives.
-
     sig_handler_t *handler = (sig_handler_t *) arg;
 
     int sig, err;
+    
+    // wait for SIGINTs
     while (1) {
         if ((err = sigwait(&handler->set, &sig))) {
             handle_error_en(err, "sigwait:");
         }
 
-        printf("SIGINT recieved, canceling all clients\n"); // TODO: remove
+        printf("SIGINT recieved, canceling all clients\n");
 
         pthread_mutex_lock(&thread_list_mutex);
         delete_all();
@@ -360,10 +353,14 @@ void *monitor_signal(void *arg) {
     return NULL;
 }
 
+/*
+ * sig_handler_constructor - function that creates the signal handler thread.
+ * initializes the handler struct and creates a thread calling monitor_signal.
+ * 
+ * Returns: pointer to the sig_handler_t struct containing the signal handler
+ * thread
+ */
 sig_handler_t *sig_handler_constructor() {
-    // TODO: Create a thread to handle SIGINT. The thread that this function
-    // creates should be the ONLY thread that ever responds to SIGINT.
-    
     // initialize handler
     sig_handler_t *handler = checked_malloc(sizeof(sig_handler_t));
     
@@ -377,32 +374,43 @@ sig_handler_t *sig_handler_constructor() {
     return handler;
 }
 
+/*
+ * sig_handler_destructor - frees the signal handler thread and any resources
+ * associated with its corresponding struct
+ * 
+ * Arguments: sighandler: pointer to the sig_handler_t struct containing the
+ * signal handler thread, previously returned by a call to 
+ * sig_handler_constructor
+ */
 void sig_handler_destructor(sig_handler_t *sighandler) {
-    // TODO: Free any resources allocated in sig_handler_constructor.
-    // Cancel and join with the signal handler's thread.
-
     pthread_cancel(sighandler->thread);
     pthread_join(sighandler->thread, NULL);
     free(sighandler);
 }
 
 // The arguments to the server should be the port number.
+/*
+ * main - runs the server. Creates listener and signal handler threads which
+ * listen for incoming connections on the given port and monitor for SIGINTs, 
+ * respectively. Then starts server REPL, which executes "s" (stop), "g" (go),
+ * and "p" (print) commands until EOF (ctrl+D) is read in, at which point the
+ * server stops accepting new connections and cleans up itself and the database.
+ * 
+ * Arguments - argc: number of args, argv: command-line arguments - should
+ * number two, with the second being the port number to listen on (should be
+ * greater than 1023).
+ * 
+ * Returns - exit code for the process
+ * 
+ * Usage - ./server <port>
+ *          REPL commands:
+ *              - s: stops execution of all client threads
+ *              - g: resumes execution of all client threads
+ *              - p <file>: print representation of current state of database
+ *                          to the given file. If no file is provided, prints to
+ *                          STDOUT
+ */
 int main(int argc, char *argv[]) {
-    // TODO:
-    // Step 1: Set up the signal handler for handling SIGINT.
-    // Step 2: ignore SIGPIPE so that the server does not abort when a client
-    // disocnnects 
-    // Step 3: Start a listener thread for clients (see start_listener in
-    //       comm.c).
-    // Step 4: Loop for command line input and handle accordingly until EOF.
-    // Step 5: Destroy the signal handler, delete all clients, cleanup the
-    //       database, cancel and join with the listener thread
-    //
-    // You should ensure that the thread list is empty before cleaning up the
-    // database and canceling the listener thread. Think carefully about what
-    // happens in a call to delete_all() and ensure that there is no way for a
-    // thread to add itself to the thread list after the server's final
-    // delete_all().
 
     int port, rd_len;
     sigset_t set;
@@ -442,6 +450,7 @@ int main(int argc, char *argv[]) {
             return -1;
         }
 
+        // execute commands
         switch (buf[0]) {
             case 's':
                 // stop

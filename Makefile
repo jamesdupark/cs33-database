@@ -1,5 +1,5 @@
 cc = gcc
-ccflags = -g -I. -std=gnu99 -Wall -pthread -fsanitize=thread 
+ccflags = -g -I. -std=gnu99 -Wall -pthread # -fsanitize=thread 
 # ccflags += -fsanitize=address
 
 all: server client

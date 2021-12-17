@@ -63,6 +63,8 @@ int accepting = 1;
 pthread_mutex_t accepting_mutex = PTHREAD_MUTEX_INITIALIZER;
 server_control_t server_state = { PTHREAD_MUTEX_INITIALIZER, 
                                   PTHREAD_COND_INITIALIZER, 0 };
+client_control_t stop_go = { PTHREAD_MUTEX_INITIALIZER, 
+                              PTHREAD_COND_INITIALIZER, 0 };
 
 void *run_client(void *arg);
 void *monitor_signal(void *arg);
@@ -111,18 +113,31 @@ void checked_pthr_create(pthread_t *thread, const pthread_attr_t *attr,
 void client_control_wait() {
     // TODO: Block the calling thread until the main thread calls
     // client_control_release(). See the client_control_t struct.
+    pthread_mutex_lock(&stop_go.go_mutex);
+    while (stop_go.stopped) {
+        pthread_cond_wait(&stop_go.go);
+    }
+
+    pthread_mutex_unlock(&stop_go.go_mutex);    
 }
 
 // Called by main thread to stop client threads
 void client_control_stop() {
     // TODO: Ensure that the next time client threads call client_control_wait()
     // at the top of the event loop in run_client, they will block.
+    pthread_mutex_lock(&stop_go.go_mutex);
+    stop_go.stopped = 1;
+    pthread_mutex_unlock(&stop_go.go_mutex);
 }
 
 // Called by main thread to resume client threads
 void client_control_release() {
     // TODO: Allow clients that are blocked within client_control_wait()
     // to continue. See the client_control_t struct.
+    pthread_mutex_lock(&stop_go.go_mutex);
+    stop_go.stopped = 0;
+    pthread_cond_broadcast(&stop_go.go);
+    pthread_mutex_unlock(&stop_go.go_mutex);
 }
 
 // Called by listener (in comm.c) to create a new client thread
@@ -243,7 +258,10 @@ void *run_client(void *arg) {
     char command[1024];
     memset(command, 0, 1024);
     while (1) {
-        // read commands in?
+        // wait on client cond if applicable
+        client_control_wait();
+
+        // read commands in
         if (comm_serve(client->cxstr, response, command) < 0) { // client closed
             break;
         }
@@ -426,14 +444,16 @@ int main(int argc, char *argv[]) {
         switch (buf[0]) {
             case 's':
                 // stop
-
                 fprintf(stderr, "stopping all clients\n");
+                
+                client_control_stop();
                 continue;
             
             case 'g':
                 // go
-
                 fprintf(stderr, "releasing all clients\n");
+                
+                client_control_release();
                 continue;
 
             case 'p':
@@ -452,19 +472,21 @@ int main(int argc, char *argv[]) {
 
     // wait on server condition variable
     pthread_mutex_lock(&server_state.server_mutex);
+    
+    printf("exiting database\n");
     accepting = 0;
+    
     pthread_mutex_lock(&thread_list_mutex);
+    
     delete_all();
     pthread_mutex_unlock(&thread_list_mutex);
     while(server_state.num_client_threads > 0) {
-        printf("waiting on cond var\n");
         pthread_cond_wait(&server_state.server_cond, &server_state.server_mutex);
     }
 
+    // check thread list empty
     assert(server_state.num_client_threads == 0);
     assert(thread_list_head == NULL);
-
-    printf("cond var released\n");
 
     // clean up db
     db_cleanup();
@@ -478,6 +500,5 @@ int main(int argc, char *argv[]) {
 
     // clean up resources
     free(buf);
-    printf("exiting database\n");
     return 0;
 }

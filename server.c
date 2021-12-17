@@ -96,7 +96,8 @@ void *checked_malloc(size_t size) {
  * single argument, to be run upon creation of thread, arg: argument to be
  * passed into start_routine. 
  */
-void checked_pthr_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg) {
+void checked_pthr_create(pthread_t *thread, const pthread_attr_t *attr, 
+                         void *(*start_routine)(void *), void *arg) {
     int en;
     if ((en = pthread_create(thread, attr, start_routine, arg))) {
         handle_error_en(en, "pthread_create:");
@@ -157,6 +158,12 @@ void client_constructor(FILE *cxstr) {
     }
 }
 
+/*
+ * client_destructor - takes in a client object and frees all resources
+ * associated with it.
+ * 
+ * Arguments - client: pointer to the client object to be destroyed
+ */
 void client_destructor(client_t *client) {
     // TODO: Free and close all resources associated with a client.
     // Whatever was malloc'd in client_constructor should
@@ -174,7 +181,14 @@ void client_destructor(client_t *client) {
     free(client);
 }
 
-// Code executed by a client thread
+/*
+ * run_client - function to be executed by client thread. If server is still
+ * accepting clients, adds client to client list and then repeatedly calls 
+ * comm_serve and intepret_command until client closes the connection.
+ * 
+ * Arguments: arg: pointer to the client struct that represents this thread's
+ * client.
+ */
 void *run_client(void *arg) {
     // TODO:
     // Step 1: Make sure that the server is still accepting clients. This will
@@ -314,13 +328,10 @@ sig_handler_t *sig_handler_constructor() {
     sig_handler_t *handler = checked_malloc(sizeof(sig_handler_t));
     
     // add SIGINT to handler set
-    if (sigemptyset(&handler->set) < 0) {
-        perror("sigemptyset:");
-        exit(1);
-    }
-    
+    sigemptyset(&handler->set);
     sigaddset(&handler->set, SIGINT);
 
+    // create thread
     checked_pthr_create(&handler->thread, 0, monitor_signal, handler);    
 
     return handler;
@@ -383,6 +394,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // clean up resources
     free(buf);
     sig_handler_destructor(handler);
     return 0;

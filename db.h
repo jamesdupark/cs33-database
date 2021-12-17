@@ -6,13 +6,14 @@
 typedef struct node {
     char *name;
     char *value;
+    pthread_rwlock_t lock;
     struct node *lchild;
     struct node *rchild;
 } node_t;
 
 extern node_t head;
 
-node_t *search(char *name, node_t *parent, node_t **parentp);
+node_t *search(char *name, node_t *parent, node_t **parentp, int write);
 
 /**
   * The db_query() function calls search() to retrieve the node associated with the 

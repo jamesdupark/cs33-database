@@ -11,7 +11,7 @@
 // The root node of the binary tree, unlike all
 // other nodes in the tree, this one is never
 // freed (it's allocated in the data region).
-node_t head = {"", "", 0, 0};
+node_t head = {"", "", PTHREAD_RWLOCK_INITIALIZER, 0, 0};
 
 node_t *node_constructor(char *arg_name, char *arg_value, node_t *arg_left,
                          node_t *arg_right) {
@@ -47,6 +47,15 @@ node_t *node_constructor(char *arg_name, char *arg_value, node_t *arg_left,
         return 0;
     }
 
+    // adding rwlock
+    int err;
+    if ((err = pthread_rwlock_init(&new_node->lock, 0))) {
+        free(new_node->name);
+        free(new_node->value);
+        free(new_node);
+        return 0;
+    }
+
     new_node->lchild = arg_left;
     new_node->rchild = arg_right;
     return new_node;
@@ -55,6 +64,7 @@ node_t *node_constructor(char *arg_name, char *arg_value, node_t *arg_left,
 void node_destructor(node_t *node) {
     if (node->name != 0) free(node->name);
     if (node->value != 0) free(node->value);
+    pthread_rwlock_destroy(&node->lock);
     free(node);
 }
 
@@ -99,8 +109,10 @@ int db_remove(char *name) {
     node_t *next;
 
     // first, find the node to be removed
-    if ((dnode = search(name, &head, &parent)) == 0) {
+    pthread_rwlock_wrlock(&head->lock);
+    if ((dnode = search(name, &head, &parent, 1)) == 0) {
         // it's not there
+        pthread_rwlock_unlock(&(*parent->lock));
         return (0);
     }
 
@@ -115,6 +127,8 @@ int db_remove(char *name) {
             parent->rchild = dnode->lchild;
 
         // done with dnode
+        pthread_rwlock_unlock(&dnode->lock);
+        pthread_rwlock_unlock(&(*parent->lock));
         node_destructor(dnode);
     } else if (dnode->lchild == 0) {
         // ditto if the node had no left child
@@ -124,6 +138,8 @@ int db_remove(char *name) {
             parent->rchild = dnode->rchild;
 
         // done with dnode
+        pthread_rwlock_unlock(&dnode->lock);
+        pthread_rwlock_unlock(&(*parent->lock));
         node_destructor(dnode);
     } else {
         // Find the lexicographically smallest node in the right subtree and
@@ -131,14 +147,19 @@ int db_remove(char *name) {
         // lexicographically smaller than all nodes in its right subtree, and
         // greater than all nodes in its left subtree
 
+        pthread_rwlock_unlock(&parent->lock); // we no longer need parent lock
+        pthread_rwlock_wrlock(&dnode->rchild->lock);
         next = dnode->rchild;
         node_t **pnext = &dnode->rchild;
 
         while (next->lchild != 0) {
             // work our way down the lchild chain, finding the smallest node
             // in the subtree.
+            pthread_rwlock_wrlock(&next->lchild->lock); // lock child
             node_t *nextl = next->lchild;
             pnext = &next->lchild;
+
+            pthread_rwlock_unlock(&next->lock); // unlock parent
             next = nextl;
         }
 
@@ -149,13 +170,16 @@ int db_remove(char *name) {
         snprintf(dnode->value, MAXLEN, "%s", next->value);
         *pnext = next->rchild;
 
+        pthread_rwlock_unlock(&next->lock);
         node_destructor(next);
+
+        pthread_rwlock_unlock(&dnode->lock);
     }
 
     return (1);
 }
 
-node_t *search(char *name, node_t *parent, node_t **parentpp) {
+node_t *search(char *name, node_t *parent, node_t **parentpp, int write) {
     // Search the tree, starting at parent, for a node containing
     // name (the "target node").  Return a pointer to the node,
     // if found, otherwise return 0.  If parentpp is not 0, then it points
@@ -169,6 +193,7 @@ node_t *search(char *name, node_t *parent, node_t **parentpp) {
     node_t *next;
     node_t *result;
 
+    // parent is locked going into this function
     if (strcmp(name, parent->name) < 0) {
         next = parent->lchild;
     } else {
@@ -178,15 +203,26 @@ node_t *search(char *name, node_t *parent, node_t **parentpp) {
     if (next == NULL) {
         result = NULL;
     } else {
+        // lock child
+        if (write) {
+            pthread_rwlock_wrlock(&next->lock);
+        } else {
+            pthread_rwlock_rdlock(&next->lock);
+        }
+
         if (strcmp(name, next->name) == 0) {
             result = next;
         } else {
+            pthread_rwlock_unlock(&parent->lock); // HOH locking
             return search(name, next, parentpp);
         }
     }
 
     if (parentpp != NULL) {
         *parentpp = parent;
+    } else {
+        // unlock parent b/c we lose the node on return
+        pthread_rwlock_unlock(&parent->lock);
     }
 
     return result;

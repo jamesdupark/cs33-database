@@ -218,8 +218,14 @@ void *run_client(void *arg) {
         // update links
         client_t *next = thread_list_head;
         client_t *prev = thread_list_head->prev;
+        
+        // updating links for new node
         client->prev = prev;
         client->next = next;
+
+        // updating links for old nodes
+        next->prev = client;
+        prev->next = client;
     }
 
     thread_list_head = client;

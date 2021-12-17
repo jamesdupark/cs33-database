@@ -114,7 +114,7 @@ void client_control_wait() {
     // TODO: Block the calling thread until the main thread calls
     // client_control_release(). See the client_control_t struct.
     pthread_mutex_lock(&stop_go.go_mutex);
-    pthread_cleanup_push((void *(void *)) pthread_mutex_unlock, &stop_go.go_mutex);
+    pthread_cleanup_push((void (*)(void *)) pthread_mutex_unlock, &stop_go.go_mutex);
     while (stop_go.stopped) {
         pthread_cond_wait(&stop_go.go, &stop_go.go_mutex);
     }

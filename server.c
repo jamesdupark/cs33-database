@@ -238,9 +238,9 @@ void *run_client(void *arg) {
     pthread_cleanup_push(thread_cleanup, client);
     
     // Loop comm_serve
-    char *response = checked_malloc(1024);
+    char response[1024];
     memset(response, 0, 1024);
-    char *command = checked_malloc(1024);
+    char command[1024];
     memset(command, 0, 1024);
     while (1) {
         // read commands in?

@@ -396,5 +396,6 @@ int main(int argc, char *argv[]) {
     // clean up resources
     free(buf);
     sig_handler_destructor(handler);
+    printf("exiting main thread");
     return 0;
 }

@@ -274,7 +274,7 @@ void delete_all() {
         pthread_cancel(current->thread);
         current = next;
         next = current->next;
-    } while (next != thread_list_head)
+    } while (next != thread_list_head);
 }
 
 // Cleanup routine for client threads, called on cancels and exit.
@@ -309,7 +309,7 @@ void thread_cleanup(void *arg) {
     // check if 0 and then destroy database
     pthread_mutex_lock(&server_state.server_mutex);
     server_state.num_client_threads -= 1;
-    if (num_threads == 0) {
+    if (server_state.num_client_threads == 0) {
         pthread_cond_broadcast(&server_state.server_cond);
     }
     pthread_mutex_unlock(&server_state.server_mutex);
@@ -442,14 +442,14 @@ int main(int argc, char *argv[]) {
     // wait on server condition variable
     pthread_mutex_lock(&server_state.server_mutex);
     accepting = 0;
-    while(num_threads > 0) {
+    while(server_state.num_client_threads > 0) {
         pthread_cond_wait(&server_state.server_cond, &server_state.server_mutex);
     }
 
     pthread_mutex_lock(&thread_list_mutex);
     delete_all();
     pthread_mutex_unlock(&thread_list_mutex);
-    pthread_mutex_unlock(&server->state->server_mutex);
+    pthread_mutex_unlock(&server_state->server_mutex);
 
     // clean up resources
     free(buf);

@@ -91,7 +91,8 @@ int db_add(char *name, char *value) {
     node_t *newnode;
 
     pthread_rwlock_wrlock(&head.lock);
-    if ((target = search(name, &head, &parent, 1)) != 0) { // node already exists
+    if ((target = search(name, &head, &parent, 1)) !=
+        0) {  // node already exists
         pthread_rwlock_unlock(&parent->lock);
         pthread_rwlock_unlock(&target->lock);
         return (0);
@@ -146,7 +147,8 @@ int db_remove(char *name) {
 
         // done with dnode
         pthread_rwlock_unlock(&dnode->lock);
-        pthread_rwlock_unlock(&parent->lock);;
+        pthread_rwlock_unlock(&parent->lock);
+        ;
         node_destructor(dnode);
     } else {
         // Find the lexicographically smallest node in the right subtree and
@@ -154,7 +156,7 @@ int db_remove(char *name) {
         // lexicographically smaller than all nodes in its right subtree, and
         // greater than all nodes in its left subtree
 
-        pthread_rwlock_unlock(&parent->lock); // we no longer need parent lock
+        pthread_rwlock_unlock(&parent->lock);  // we no longer need parent lock
         pthread_rwlock_wrlock(&dnode->rchild->lock);
         next = dnode->rchild;
         node_t **pnext = &dnode->rchild;
@@ -162,11 +164,11 @@ int db_remove(char *name) {
         while (next->lchild != 0) {
             // work our way down the lchild chain, finding the smallest node
             // in the subtree.
-            pthread_rwlock_wrlock(&next->lchild->lock); // lock child
+            pthread_rwlock_wrlock(&next->lchild->lock);  // lock child
             node_t *nextl = next->lchild;
             pnext = &next->lchild;
 
-            pthread_rwlock_unlock(&next->lock); // unlock parent
+            pthread_rwlock_unlock(&next->lock);  // unlock parent
             next = nextl;
         }
 
@@ -220,7 +222,7 @@ node_t *search(char *name, node_t *parent, node_t **parentpp, int write) {
         if (strcmp(name, next->name) == 0) {
             result = next;
         } else {
-            pthread_rwlock_unlock(&parent->lock); // HOH locking
+            pthread_rwlock_unlock(&parent->lock);  // HOH locking
             return search(name, next, parentpp, write);
         }
     }
@@ -243,7 +245,7 @@ static inline void print_spaces(int lvl, FILE *out) {
 
 /* helper function for db_print */
 void db_print_recurs(node_t *node, int lvl, FILE *out) {
-    //TODO: Make this thread-safe!
+    // TODO: Make this thread-safe!
     // print spaces to differentiate levels
     print_spaces(lvl, out);
 
@@ -304,7 +306,6 @@ void db_cleanup_recurs(node_t *node) {
 
     node_destructor(node);
 }
-
 
 void db_cleanup() {
     db_cleanup_recurs(head.lchild);

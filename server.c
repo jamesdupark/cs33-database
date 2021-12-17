@@ -342,8 +342,6 @@ void sig_handler_destructor(sig_handler_t *sighandler) {
     // TODO: Free any resources allocated in sig_handler_constructor.
     // Cancel and join with the signal handler's thread.
 
-    sigemptyset(&sighandler->set);
-
     pthread_cancel(sighandler->thread);
     pthread_join(sighandler->thread, NULL);
     free(sighandler);

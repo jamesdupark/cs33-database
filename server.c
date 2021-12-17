@@ -169,12 +169,6 @@ void client_destructor(client_t *client) {
     // Whatever was malloc'd in client_constructor should
     // be freed here!
 
-    // cancel thread
-    int err;
-    if ((err = pthread_cancel(client->thread))) {
-        handle_error_en(err, "pthread_cancel:");
-    }
-
     // close file
     comm_shutdown(client->cxstr);
     

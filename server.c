@@ -274,10 +274,10 @@ void thread_cleanup(void *arg) {
     // close links
     next->prev = prev;
     prev->next = next;
-    pthread_mutex_unlock(&thread_list_mutex);
 
     // destroy thread
     client_destructor(client);
+    pthread_mutex_unlock(&thread_list_mutex);
 
     // TODO: decrement thread_num
     // check if 0 and then destroy database

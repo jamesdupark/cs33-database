@@ -276,9 +276,9 @@ void thread_cleanup(void *arg) {
     client_t *next = client->next;
 
     // if thread is current head of list, update head
-    if (next == client) {
+    if (next == client) { // edge case - client is last element in list
         thread_list_head = NULL;
-    } else if (client == thread_list_head) {
+    } else {
         thread_list_head = next;
     }
 
@@ -411,6 +411,8 @@ int main(int argc, char *argv[]) {
             case 'p':
                 //print
                 filename = strtok((buf + 1), " \t");
+                size_t len = strlen(filename);
+                filename[len - 1] = '\0';
                 db_print(filename);
                 continue;
         }

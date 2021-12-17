@@ -252,9 +252,6 @@ void *run_client(void *arg) {
         interpret_command(command, response, 1024);
     }
 
-    
-    free(response);
-    free(command);
     pthread_cleanup_pop(1);
     return NULL;
 }

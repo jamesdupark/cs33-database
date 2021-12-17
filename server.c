@@ -387,7 +387,7 @@ int main(int argc, char *argv[]) {
 
     int port, rd_len;
     sigset_t set;
-    thread_t listener;
+    pthread_t listener;
     char *buf, *filename;
 
     if (argc != 2) {
@@ -461,7 +461,7 @@ int main(int argc, char *argv[]) {
         pthread_cond_wait(&server_state.server_cond, &server_state.server_mutex);
     }
 
-    assert(server_state.num_threads == 0);
+    assert(server_state.num_client_threads == 0);
     assert(thread_list_head == NULL);
 
     printf("cond var released\n");
@@ -472,7 +472,7 @@ int main(int argc, char *argv[]) {
     // clean up other threads
     sig_handler_destructor(handler);
     pthread_cancel(listener);
-    pthread_Join(listener);
+    pthread_join(listener);
 
     pthread_mutex_unlock(&server_state.server_mutex);
 

@@ -71,8 +71,8 @@ void node_destructor(node_t *node) {
 void db_query(char *name, char *result, int len) {
     // TODO: Make this thread-safe!
     node_t *target;
-    pthread_rwlock_unlock(&head.lock);
-    target = search(name, &head, 0);
+    pthread_rwlock_rdlock(&head.lock);
+    target = search(name, &head, 0, 0);
 
     if (target == 0) {
         snprintf(result, len, "not found");
@@ -92,8 +92,8 @@ int db_add(char *name, char *value) {
     node_t *target;
     node_t *newnode;
 
-    pthread_rwlock_unlock(&head.lock);
-    if ((target = search(name, &head, &parent)) != 0) { // node already exists
+    pthread_rwlock_wrlock(&head.lock);
+    if ((target = search(name, &head, &parent, 1)) != 0) { // node already exists
         pthread_rwlock_unlock(&parent->lock);
         pthread_rwlock_unlock(&target->lock);
         return (0);

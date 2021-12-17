@@ -221,10 +221,10 @@ void *run_client(void *arg) {
 
     thread_list_head = client;
     // TODO: increment thread_num
+    pthread_mutex_unlock(&thread_list_mutex);
 
     // push cleanup handler
     pthread_cleanup_push(thread_cleanup, client);
-    pthread_mutex_unlock(&thread_list_mutex);
     
     // Loop comm_serve
     char *response = checked_malloc(1024);

@@ -400,7 +400,8 @@ int main(int argc, char *argv[]) {
 
             case 'p':
                 //print
-                char *filename = strtok((buf + 1), " \t");
+                char *filename;
+                filename = strtok((buf + 1), " \t");
                 db_print(filename);
                 continue;
         }

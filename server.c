@@ -449,7 +449,7 @@ int main(int argc, char *argv[]) {
     pthread_mutex_lock(&thread_list_mutex);
     delete_all();
     pthread_mutex_unlock(&thread_list_mutex);
-    pthread_mutex_unlock(&server_state->server_mutex);
+    pthread_mutex_unlock(&server_state.server_mutex);
 
     // clean up resources
     free(buf);
